@@ -15,8 +15,9 @@ type client struct {
 }
 
 func (c *client) read() {
+	//infinity roop until a socket is closed
 	for {
-		if _, msg, err := c.socket.ReadMessage(); err != nil {
+		if _, msg, err := c.socket.ReadMessage(); err == nil {
 			c.room.foward <- msg
 		} else {
 			break
