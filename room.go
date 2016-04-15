@@ -23,6 +23,16 @@ type room struct {
 	clients map[*client]bool
 }
 
+//new room generates and returns the chat room
+func newRoom() *room {
+	return &room{
+		foward:  make(chan []byte),
+		join:    make(chan *client),
+		leave:   make(chan *client),
+		clients: make(map[*client]bool),
+	}
+}
+
 func (room *room) run() {
 	for {
 		select {
