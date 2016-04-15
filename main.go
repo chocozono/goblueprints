@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"html/template"
 	"log"
 	"net/http"
@@ -18,10 +19,14 @@ func (t *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	t.once.Do(func() {
 		t.templ = template.Must(template.ParseFiles(filepath.Join("templates", t.filename)))
 	})
-	t.templ.Execute(w, nil)
+	//2nd argument is required for template
+	t.templ.Execute(w, r)
 }
 
 func main() {
+	//e.x. ./chat -addr=":3000"
+	var addr = flag.String("addr", ":8080", "address for the application")
+	flag.Parse()
 	room := newRoom()
 	http.Handle("/", &templateHandler{filename: "chat.html"})
 	http.Handle("/room", room)
@@ -30,7 +35,8 @@ func main() {
 	go room.run()
 
 	//start webserver
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Println("Start Web server. port: ", *addr)
+	if err := http.ListenAndServe(*addr, nil); err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}
 }
