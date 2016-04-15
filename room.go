@@ -1,5 +1,12 @@
 package main
 
+import (
+	"log"
+	"net/http"
+
+	"github.com/gorilla/websocket"
+)
+
 type room struct {
 	// forward represents the channel which has some messages for transporting to another clients
 	foward chan []byte
@@ -16,28 +23,55 @@ type room struct {
 	clients map[*client]bool
 }
 
-func (r *room) run() {
+func (room *room) run() {
 	for {
 		select {
-		case client := <-r.join:
+		case client := <-room.join:
 			// join
-			r.clients[client] = true
-		case client := <-r.leave:
+			room.clients[client] = true
+		case client := <-room.leave:
 			// leave
-			delete(r.clients, client)
+			delete(room.clients, client)
 			close(client.send)
-		case msg := <-r.foward:
+		case msg := <-room.foward:
 			// send messages to all clients
-			for client := range r.clients {
+			for client := range room.clients {
 				select {
 				case client.send <- msg:
 					// send a message
 				default:
 					// if failed sending message
-					delete(r.clients, client)
+					delete(room.clients, client)
 					close(client.send)
 				}
 			}
 		}
 	}
+}
+
+const (
+	socketBufferSize  = 1024
+	messageBufferSize = 256
+)
+
+var upgrader = &websocket.Upgrader{
+	ReadBufferSize:  socketBufferSize,
+	WriteBufferSize: socketBufferSize,
+}
+
+func (room *room) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	socket, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Fatal("ServeHTTP: ", err)
+		return
+	}
+	client := &client{
+		socket: socket,
+		send:   make(chan []byte, messageBufferSize),
+		room:   room,
+	}
+	room.join <- client
+	defer func() { room.leave <- client }()
+	go client.write()
+	client.read()
 }
